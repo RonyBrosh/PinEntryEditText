@@ -50,6 +50,10 @@ import java.util.Locale;
 public class PinEntryEditText extends EditText {
     private static final String XML_NAMESPACE_ANDROID = "http://schemas.android.com/apk/res/android";
 
+    // This parameter is used in order to check is the current digit is visible or should be hidden
+    // Relevant only if the edit text input type is password.
+    private boolean mIsLetterAlreadyVisible = true;
+    
     protected String mMask = null;
     protected StringBuilder mMaskChars = null;
     protected String mSingleCharHint = null;
@@ -326,12 +330,56 @@ public class PinEntryEditText extends EditText {
         }
     }
 
-    private CharSequence getFullText() {
-        if (mMask == null) {
-            return getText();
-        } else {
-            return getMaskChars();
+    private CharSequence getFullText()
+    {
+        CharSequence result;
+        
+        // If the edit text input type is not a password return the original text.
+        if (mMask == null)
+        {
+            result = getText();
         }
+        else
+        {
+            if (mIsLetterAlreadyVisible == false)
+            {
+                // If the edit text input type it is a password return the partial relevant text hidden.
+                // After the animation will end the last letter will be hidden too.
+                result = getPartialMaskChars();
+            }
+            else
+            {
+                // All letters should be hidden.
+                result = getMaskChars();
+            }
+        }
+        return result;
+    }
+    
+    /*
+    *   This method return all leters hidden except for the last letter or null if the text size is 0
+    *   Or the last letter not hidden if the text size is 1.
+    */
+    private CharSequence getPartialMaskChars()
+    {
+        CharSequence result = null;
+        String currentText = getText().toString();
+        int textLength = currentText.length();
+        if (textLength == 1)
+        {
+            result = currentText;
+        }
+        else if (textLength > 1)
+        {
+            String tempText = "";
+            for (int index = 0; index < textLength - 1; index++)
+            {
+                tempText += mMask;
+            }
+            tempText += currentText.substring(currentText.length() - 1);
+            result = tempText;
+        }
+        return result;
     }
 
     private StringBuilder getMaskChars() {
@@ -441,6 +489,33 @@ public class PinEntryEditText extends EditText {
             public void onAnimationUpdate(ValueAnimator animation) {
                 mLastCharPaint.setTextSize((Float) animation.getAnimatedValue());
                 PinEntryEditText.this.invalidate();
+            }
+        });
+        
+        // Add listener so get notify that the animation finished and the relevant letters can be hidden.
+        va.addListener(new Animator.AnimatorListener()
+        {
+            @Override
+            public void onAnimationStart(Animator animation)
+            {
+                mIsLetterAlreadyVisible = false;
+            }
+
+            @Override
+            public void onAnimationEnd(Animator animation)
+            {
+                mIsLetterAlreadyVisible = true;
+                PinEntryEditText.this.invalidate();
+            }
+
+            @Override
+            public void onAnimationCancel(Animator animation)
+            {
+            }
+
+            @Override
+            public void onAnimationRepeat(Animator animation)
+            {
             }
         });
         if (getText().length() == mMaxLength && mOnPinEnteredListener != null) {
